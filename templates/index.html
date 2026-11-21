@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Нечіткий регулятор швидкості вентилятора</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header>
+    <h1>Нечіткий регулятор швидкості вентилятора</h1>
+    <p>Лабораторна робота №7, варіант 14 · входи: температура, вологість, CO₂ · вихід: керувальний сигнал (%)</p>
+</header>
+
+<main>
+    <section class="card">
+        <h2>Параметри експерименту</h2>
+        <form id="sim-form" class="grid">
+            <label>Початкова температура, °C
+                <input type="number" id="temperature0" step="0.1"
+                       min="{{ limits.temperature0.min }}" max="{{ limits.temperature0.max }}"
+                       value="{{ defaults.temperature0 }}"></label>
+            <label>Початкова вологість, %
+                <input type="number" id="humidity0" step="0.1"
+                       min="{{ limits.humidity0.min }}" max="{{ limits.humidity0.max }}"
+                       value="{{ defaults.humidity0 }}"></label>
+            <label>Початковий CO₂, ppm
+                <input type="number" id="co2_0" step="1"
+                       min="{{ limits.co2_0.min }}" max="{{ limits.co2_0.max }}"
+                       value="{{ defaults.co2_0 }}"></label>
+            <label>Тривалість, хв
+                <input type="number" id="duration" step="1"
+                       min="{{ limits.duration.min }}" max="{{ limits.duration.max }}"
+                       value="{{ defaults.duration }}"></label>
+            <label>Момент збурення, хв
+                <input type="number" id="disturbance_time" step="1"
+                       min="{{ limits.disturbance_time.min }}" max="{{ limits.disturbance_time.max }}"
+                       value="{{ defaults.disturbance_time }}"></label>
+            <label>Множник збурення (виділення ×)
+                <input type="number" id="disturbance_gain" step="0.1"
+                       min="{{ limits.disturbance_gain.min }}" max="{{ limits.disturbance_gain.max }}"
+                       value="{{ defaults.disturbance_gain }}"></label>
+            <label>Стала часу вентилятора, хв
+                <input type="number" id="tau_fan" step="0.5"
+                       min="{{ limits.tau_fan.min }}" max="{{ limits.tau_fan.max }}"
+                       value="{{ defaults.tau_fan }}"></label>
+            <div class="actions">
+                <button type="submit" id="run-btn">Запустити моделювання</button>
+                <span id="export-links" hidden>
+                    <a id="csv-link" class="btn-link" href="#">CSV</a>
+                    <a id="xlsx-link" class="btn-link" href="#">XLSX</a>
+                </span>
+            </div>
+        </form>
+        <p id="message" class="message" role="alert" hidden></p>
+    </section>
+
+    <section class="card">
+        <h2>Перехідний процес</h2>
+        <div class="charts">
+            <div class="chart-box"><canvas id="chart-temperature"></canvas></div>
+            <div class="chart-box"><canvas id="chart-humidity"></canvas></div>
+            <div class="chart-box"><canvas id="chart-co2"></canvas></div>
+            <div class="chart-box"><canvas id="chart-fan"></canvas></div>
+        </div>
+        <p class="hint">Пунктиром показано межі зони комфорту: T 20–26 °C, H 40–60 %, CO₂ ≤ 1000 ppm.</p>
+    </section>
+
+    <section class="card">
+        <h2>Показники якості</h2>
+        <table id="metrics-table">
+            <thead><tr><th>Величина</th><th>Макс.</th><th>Мін.</th><th>Усталене</th><th>Вхід у зону, хв</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <ul id="metrics-extra" class="extra"></ul>
+    </section>
+
+    <section class="card">
+        <h2>Контрольні значення нечіткого висновку</h2>
+        <form id="infer-form" class="grid">
+            <label>Температура, °C
+                <input type="number" id="in-t" step="0.1" value="30"
+                       min="{{ universes.temperature[0] }}" max="{{ universes.temperature[1] }}"></label>
+            <label>Вологість, %
+                <input type="number" id="in-h" step="0.1" value="70"
+                       min="{{ universes.humidity[0] }}" max="{{ universes.humidity[1] }}"></label>
+            <label>CO₂, ppm
+                <input type="number" id="in-c" step="1" value="1500"
+                       min="{{ universes.co2[0] }}" max="{{ universes.co2[1] }}"></label>
+            <div class="actions"><button type="submit">Обчислити</button></div>
+        </form>
+        <p id="infer-result" class="result"></p>
+        <p id="infer-message" class="message" role="alert" hidden></p>
+    </section>
+
+    <section class="card">
+        <h2>Функції належності</h2>
+        <div class="charts">
+            <div class="chart-box"><canvas id="mf-temperature"></canvas></div>
+            <div class="chart-box"><canvas id="mf-humidity"></canvas></div>
+            <div class="chart-box"><canvas id="mf-co2"></canvas></div>
+            <div class="chart-box"><canvas id="mf-fan"></canvas></div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>База правил (27 правил)</h2>
+        <table id="rules-table">
+            <thead><tr><th>№</th><th>Температура</th><th>Вологість</th><th>CO₂</th><th>Швидкість вентилятора</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>Історія експериментів</h2>
+        <table id="history-table">
+            <thead><tr><th>№</th><th>Дата</th><th>T₀, °C</th><th>H₀, %</th><th>CO₂₀, ppm</th><th>Збурення</th><th>Усі в зоні, хв</th><th>Експорт</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </section>
+</main>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
